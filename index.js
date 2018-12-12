@@ -133,7 +133,7 @@ class Microed {
     }
 
     try {
-      let data = await new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         this.producer.send(payloads, (err, data) => {
           if (err) {
             return reject(err);

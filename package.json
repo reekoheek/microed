@@ -1,6 +1,6 @@
 {
   "name": "microed",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Kafka based microservices event driven client",
   "main": "index.js",
   "scripts": {
@@ -9,13 +9,23 @@
   },
   "author": "Ganesha <reekoheek@gmail.com> (http://sagara.id)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reekoheek/microed.git"
+  },
   "dependencies": {
     "debug": "^4.1.0",
     "kafka-node": "^3.0.1"
   },
   "devDependencies": {
     "bono": "^1.0.2",
+    "husky": "^1.2.0",
     "node-norm": "^1.2.17",
     "supertest": "^3.3.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run lint && npm test"
+    }
   }
 }
