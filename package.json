@@ -1,0 +1,21 @@
+{
+  "name": "microed",
+  "version": "0.1.0",
+  "description": "Kafka based microservices event driven client",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "mocha test/**"
+  },
+  "author": "Ganesha <reekoheek@gmail.com> (http://sagara.id)",
+  "license": "MIT",
+  "dependencies": {
+    "debug": "^4.1.0",
+    "kafka-node": "^3.0.1"
+  },
+  "devDependencies": {
+    "bono": "^1.0.2",
+    "node-norm": "^1.2.17",
+    "supertest": "^3.3.0"
+  }
+}
