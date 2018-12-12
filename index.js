@@ -26,8 +26,17 @@ class Microed {
       consumer.topic = topic;
       consumer.observers = [];
 
-      consumer.on('error', err => {
-        debug('Consumer error', err);
+      consumer.on('error', () => {
+        // noop
+        // debug('Consumer error', err);
+      });
+
+      client.on('connect', () => {
+        clearTimeout(consumer.tDebounceResume);
+        consumer.tDebounceResume = setTimeout(() => {
+          consumer.setOffset(topic, 0, 0);
+          consumer.resume();
+        }, 1000);
       });
 
       consumer.on('message', async message => {
@@ -50,6 +59,7 @@ class Microed {
   unobserve (topic, callback) {
     if (!topic) {
       this.consumers.forEach(consumer => {
+        clearTimeout(consumer.tDebounceResume);
         consumer.close();
         consumer.client.close();
       });
@@ -76,19 +86,20 @@ class Microed {
     if (consumer.observers.length === 0) {
       this.consumers.splice(consumerIndex, 1);
 
+      clearTimeout(consumer.tDebounceResume);
       consumer.close();
       consumer.client.close();
     }
   }
 
-  send (topic, value) {
+  async send (topic, value) {
     this.messages.push({ topic, value });
 
     if (!this.producer.ready) {
       return;
     }
 
-    this.sendMessages();
+    await this.sendMessages();
   }
 
   async destroy () {
@@ -101,7 +112,7 @@ class Microed {
     }));
   }
 
-  sendMessages () {
+  async sendMessages () {
     if (this.messages.length === 0) {
       return;
     }
@@ -121,16 +132,23 @@ class Microed {
       payloads.push(topicGroups[topic]);
     }
 
-    this.producer.send(payloads, (err, data) => {
-      if (err) {
-        debug('Send error', err);
-        return;
-      }
+    try {
+      let data = await new Promise((resolve, reject) => {
+        this.producer.send(payloads, (err, data) => {
+          if (err) {
+            return reject(err);
+          }
 
-      debug('Sent', data);
-    });
+          resolve(data);
+        });
+      });
 
-    this.messages = [];
+      // debug('Sent', data);
+      this.messages = [];
+    } catch (err) {
+      // noop
+      // debug('Send error', err);
+    }
   }
 
   createProducer () {
@@ -138,8 +156,9 @@ class Microed {
 
     let producer = new HighLevelProducer(client);
 
-    producer.on('error', err => {
-      debug('Producer error', err);
+    producer.on('error', () => {
+      // noop
+      // debug('Producer error', err);
     });
 
     producer.once('ready', () => {
@@ -152,8 +171,9 @@ class Microed {
   createClient () {
     let client = new KafkaClient(this.options);
 
-    client.on('error', err => {
-      debug('Client error', err);
+    client.on('error', () => {
+      // noop
+      // debug('Client error', err);
     });
 
     return client;
