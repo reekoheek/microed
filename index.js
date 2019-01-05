@@ -1,5 +1,7 @@
 const { KafkaClient, Consumer, HighLevelProducer } = require('kafka-node');
 const debug = require('debug')('microed:microed');
+const levelup = require('levelup');
+const leveldown = require('leveldown');
 
 class Microed {
   static get MicroedObserver () {
@@ -14,14 +16,24 @@ class Microed {
     this.options = options;
     this.producer = this.createProducer();
     this.consumers = [];
-    this.messages = [];
+
+    let { dataDir = './.microed' } = options || {};
+    this.dataDir = dataDir;
+    this.db = levelup(leveldown(this.dataDir));
+    this.index = 0;
+    this.unwritten = [];
+    // this.messages = [];
   }
 
   observe (topic, callback) {
     let consumer = this.consumers.find(consumer => consumer.topic === topic);
     if (!consumer) {
       let client = this.createClient();
-      consumer = new Consumer(client, [ { topic, partition: 0 } ]);
+      let opts = {
+        // autoCommit: false,
+      };
+
+      consumer = new Consumer(client, [ { topic, partition: 0 } ], opts);
 
       consumer.topic = topic;
       consumer.observers = [];
@@ -34,20 +46,26 @@ class Microed {
       client.on('connect', () => {
         clearTimeout(consumer.tDebounceResume);
         consumer.tDebounceResume = setTimeout(() => {
-          consumer.setOffset(topic, 0, 0);
+          // consumer.setOffset(topic, 0, 0);
           consumer.resume();
         }, 1000);
       });
 
       consumer.on('message', async message => {
-        if (topic !== message.topic) {
-          return;
+        consumer.pause();
+
+        if (topic === message.topic) {
+          let value = JSON.parse(message.value);
+          let result = Object.assign({}, message, { value });
+
+          await Promise.all(consumer.observers.map(observe => observe(result)));
         }
 
-        let value = JSON.parse(message.value);
-        let result = Object.assign({}, message, { value });
+        // await new Promise(resolve => {
+        //   consumer.commit(resolve);
+        // });
 
-        await Promise.all(consumer.observers.map(observe => observe(result)));
+        consumer.resume();
       });
 
       this.consumers.push(consumer);
@@ -93,16 +111,60 @@ class Microed {
   }
 
   async send (topic, value) {
-    this.messages.push({ topic, value });
+    await this.putMessage({ topic, value });
 
     if (!this.producer.ready) {
       return;
     }
 
-    await this.sendMessages();
+    this.sendAllMessages();
+  }
+
+  async putMessage (m) {
+    if (this.sending) {
+      this.unwritten.push(m);
+      // console.log('put unwritten')
+      return;
+    }
+
+    let batch = this.db.batch();
+    if (this.unwritten.length) {
+      this.unwritten.forEach(m => {
+        batch = batch.put(this.index++, JSON.stringify(m));
+      });
+      this.unwritten = [];
+    }
+
+    batch = batch.put(this.index++, JSON.stringify(m));
+
+    await batch.write();
+    // console.log('put written')
+  }
+
+  getMessages () {
+    return new Promise((resolve, reject) => {
+      let messages = [];
+      let stream = this.db.createReadStream({ limit: 1 });
+      stream.on('data', ({ key, value }) => {
+        messages.push({
+          key,
+          value: JSON.parse(value),
+        });
+      });
+
+      stream.on('error', err => {
+        reject(err);
+      });
+
+      stream.on('end', () => {
+        resolve(messages);
+      });
+    });
   }
 
   async destroy () {
+    await this.db.close();
+
     let closables = [ this.producer, ...this.consumers ];
     await Promise.all(closables.map(closable => {
       return new Promise(resolve => {
@@ -112,13 +174,52 @@ class Microed {
     }));
   }
 
-  async sendMessages () {
-    if (this.messages.length === 0) {
+  async sendAllMessages () {
+    if (this.sending) {
       return;
     }
 
+    this.sending = true;
+
+    while (true) {
+      try {
+        let messages = await this.getMessages();
+
+        if (messages.length === 0) {
+          break;
+        }
+
+        // console.log('written messages', messages);
+        await this.sendMessages(messages.map(m => m.value));
+
+        await this.deleteMessages(messages);
+      } catch (err) {
+        break;
+      }
+    }
+
+    let messages = await this.getMessages();
+    if (messages.length === 0) {
+      // drained
+      this.index = 0;
+    }
+
+    if (this.unwritten.length) {
+      try {
+        await this.sendMessages(this.unwritten);
+        this.unwritten = [];
+      } catch (err) {
+        // noop
+      }
+    }
+
+    this.sending = false;
+  }
+
+  async sendMessages (messages) {
     let topicGroups = {};
-    this.messages.forEach(({ topic, value }) => {
+
+    messages.forEach(({ topic, value }) => {
       let topicGroup = topicGroups[topic] = topicGroups[topic] || { topic, messages: [] };
       try {
         topicGroup.messages.push(JSON.stringify(value));
@@ -132,23 +233,25 @@ class Microed {
       payloads.push(topicGroups[topic]);
     }
 
-    try {
-      await new Promise((resolve, reject) => {
-        this.producer.send(payloads, (err, data) => {
-          if (err) {
-            return reject(err);
-          }
+    await new Promise((resolve, reject) => {
+      this.producer.send(payloads, (err, data) => {
+        if (err) {
+          return reject(err);
+        }
 
-          resolve(data);
-        });
+        resolve(data);
       });
+    });
+  }
 
-      // debug('Sent', data);
-      this.messages = [];
-    } catch (err) {
-      // noop
-      // debug('Send error', err);
-    }
+  async deleteMessages (messages) {
+    let batch = this.db.batch();
+
+    messages.forEach(({ key }) => {
+      batch = batch.del(key);
+    });
+
+    await batch.write();
   }
 
   createProducer () {
@@ -162,7 +265,7 @@ class Microed {
     });
 
     producer.once('ready', () => {
-      this.sendMessages();
+      this.sendAllMessages();
     });
 
     return producer;

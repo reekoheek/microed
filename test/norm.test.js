@@ -1,11 +1,22 @@
 const Microed = require('..');
 const { MicroedObserver } = Microed;
 const { Manager } = require('node-norm');
+const rmdir = require('./_lib/rmdir');
 
 describe('norm addons', () => {
+  beforeEach(async () => {
+    await rmdir('./.microed-producer');
+    await rmdir('./.microed-consumer');
+  });
+
+  afterEach(async () => {
+    await rmdir('./.microed-producer');
+    await rmdir('./.microed-consumer');
+  });
+
   it('send update as event', async () => {
-    let consumer = new Microed();
-    let producer = new Microed();
+    let producer = new Microed({ dataDir: './.microed-producer' });
+    let consumer = new Microed({ dataDir: './.microed-consumer' });
 
     try {
       let manager = createManager([

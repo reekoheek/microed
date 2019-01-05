@@ -1,15 +1,29 @@
 const Microed = require('..');
 
-let producer = new Microed();
+const INTERVAL = 100;
 
-function trySend () {
+let producer = new Microed({ dataDir: './.microed-producer' });
+
+function send () {
   let value = { date: new Date() };
 
   console.info('produce', value);
 
   producer.send('foo', value);
+}
 
-  setTimeout(trySend, 1000);
+function trySend () {
+  send();
+
+  setTimeout(trySend, INTERVAL);
 }
 
 trySend();
+
+// producer.sending = true;
+// send();
+// send();
+// send();
+// producer.sending = false;
+// send();
+// send();

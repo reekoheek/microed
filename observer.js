@@ -1,4 +1,9 @@
 class Observer {
+  constructor ({ topic, producer } = {}) {
+    this.topic = topic;
+    this.producer = producer;
+  }
+
   async insert ({ query }, next) {
     let producer = this.getProducer(query);
     let topic = this.getTopic(query);

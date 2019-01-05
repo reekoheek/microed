@@ -1,11 +1,22 @@
 const Microed = require('..');
 const assert = require('assert');
+const rmdir = require('./_lib/rmdir');
 
 describe('Microed', () => {
+  beforeEach(async () => {
+    await rmdir('./.microed-producer');
+    await rmdir('./.microed-consumer');
+  });
+
+  afterEach(async () => {
+    await rmdir('./.microed-producer');
+    await rmdir('./.microed-consumer');
+  });
+
   describe('cases', () => {
     it('produce and consume topic', async () => {
-      let producer = new Microed();
-      let consumer = new Microed();
+      let producer = new Microed({ dataDir: './.microed-producer' });
+      let consumer = new Microed({ dataDir: './.microed-consumer' });
 
       try {
         await new Promise((resolve, reject) => {
@@ -47,7 +58,7 @@ describe('Microed', () => {
 
   describe('#observe()', () => {
     it('add observer', async () => {
-      let microed = new Microed();
+      let microed = new Microed({ dataDir: './.microed-consumer' });
       try {
         microed.observe('foo', () => {});
 
@@ -61,7 +72,7 @@ describe('Microed', () => {
 
   describe('#unobserve()', () => {
     it('remove single observer', async () => {
-      let microed = new Microed();
+      let microed = new Microed({ dataDir: './.microed-consumer' });
       try {
         let observer1 = () => {};
         let observer2 = () => {};
@@ -83,7 +94,7 @@ describe('Microed', () => {
     });
 
     it('remove all observers by topic', async () => {
-      let microed = new Microed();
+      let microed = new Microed({ dataDir: './.microed-consumer' });
       try {
         let observer1 = () => {};
         let observer2 = () => {};
@@ -99,7 +110,7 @@ describe('Microed', () => {
     });
 
     it('remove all observers', async () => {
-      let microed = new Microed();
+      let microed = new Microed({ dataDir: './.microed-consumer' });
       try {
         let observer1 = () => {};
         let observer2 = () => {};
