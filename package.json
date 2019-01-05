@@ -1,6 +1,6 @@
 {
   "name": "microed",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Kafka based microservices event driven client",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,8 @@
     "debug": "^4.1.1",
     "kafka-node": "^3.0.1",
     "leveldown": "^4.0.1",
-    "levelup": "^4.0.0"
+    "levelup": "^4.0.0",
+    "sinek": "^6.23.4"
   },
   "devDependencies": {
     "bono": "^1.0.2",

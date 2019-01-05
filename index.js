@@ -1,7 +1,10 @@
-const { KafkaClient, Consumer, HighLevelProducer } = require('kafka-node');
+const { KafkaClient, HighLevelProducer } = require('kafka-node');
 const debug = require('debug')('microed:microed');
 const levelup = require('levelup');
 const leveldown = require('leveldown');
+const mkdirp = require('./lib/mkdirp');
+const path = require('path');
+const { Consumer } = require('sinek');
 
 class Microed {
   static get MicroedObserver () {
@@ -12,14 +15,20 @@ class Microed {
     return require('./middleware');
   }
 
-  constructor ({ dataDir = './.microed', clientOptions, consumerOptions, producerOptions } = {}) {
+  constructor ({ dataDir = '.microed', clientOptions = {}, consumerOptions = {}, producerOptions = {} } = {}) {
+    if (dataDir[0] !== '/') {
+      dataDir = path.resolve(process.cwd(), dataDir);
+    }
     this.dataDir = dataDir;
+
     this.clientOptions = clientOptions;
     this.consumerOptions = consumerOptions;
     this.producerOptions = producerOptions;
 
     this.producer = this.createProducer();
     this.consumers = [];
+
+    mkdirp(this.dataDir);
 
     this.db = levelup(leveldown(this.dataDir));
     this.index = 0;
@@ -29,41 +38,77 @@ class Microed {
   observe (topic, callback) {
     let consumer = this.consumers.find(consumer => consumer.topic === topic);
     if (!consumer) {
-      let client = this.createClient();
-
-      consumer = new Consumer(client, [ { topic, partition: 0 } ], this.consumerOptions);
+      consumer = new Consumer(topic, {
+        kafkaHost: this.clientOptions.kafkaHost,
+        noptions: {
+          'metadata.broker.list': this.clientOptions.kafkaHost,
+        },
+        options: this.consumerOptions,
+      });
 
       consumer.topic = topic;
       consumer.observers = [];
+
+      consumer.connect(true).then(_ => {
+        consumer.consume(async (message, callback) => {
+          try {
+            if (topic === message.topic) {
+              let value = JSON.parse(message.value);
+              let result = Object.assign({}, message, { value });
+
+              await Promise.all(consumer.observers.map(observe => observe(result)));
+            }
+
+            // await new Promise(resolve => {
+            //   consumer.commit(resolve);
+            // });
+          } catch (err) {
+            debug('Consume error', err);
+          } finally {
+            callback();
+          }
+        });
+      });
 
       consumer.on('error', err => {
         debug('Consumer error', err);
       });
 
-      client.on('connect', () => {
-        clearTimeout(consumer.tDebounceResume);
-        consumer.tDebounceResume = setTimeout(() => {
-          // consumer.setOffset(topic, 0, 0);
-          consumer.resume();
-        }, 1000);
-      });
+      // let client = this.createClient();
 
-      consumer.on('message', async message => {
-        consumer.pause();
+      // consumer = new ConsumerStream(client, [ { topic, partition: 0 } ], this.consumerOptions);
 
-        if (topic === message.topic) {
-          let value = JSON.parse(message.value);
-          let result = Object.assign({}, message, { value });
+      // consumer.topic = topic;
+      // consumer.observers = [];
 
-          await Promise.all(consumer.observers.map(observe => observe(result)));
-        }
+      // consumer.on('error', err => {
+      //   debug('Consumer error', err);
+      // });
 
-        // await new Promise(resolve => {
-        //   consumer.commit(resolve);
-        // });
+      // client.on('connect', () => {
+      //   clearTimeout(consumer.tDebounceResume);
+      //   consumer.tDebounceResume = setTimeout(() => {
+      //     // consumer.setOffset(topic, 0, 0);
+      //     consumer.resume();
+      //   }, 1000);
+      // });
 
-        consumer.resume();
-      });
+      // consumer.on('message', async message => {
+      //   consumer.pause();
+
+      //   if (topic === message.topic) {
+      //     let value = JSON.parse(message.value);
+      //     let result = Object.assign({}, message, { value });
+
+      //     await Promise.all(consumer.observers.map(observe => observe(result)));
+      //   }
+
+      //   // await new Promise(resolve => {
+      //   //   consumer.commit(resolve);
+      //   // });
+
+      //   consumer.resume();
+      // });
 
       this.consumers.push(consumer);
     }
@@ -76,7 +121,7 @@ class Microed {
       this.consumers.forEach(consumer => {
         clearTimeout(consumer.tDebounceResume);
         consumer.close();
-        consumer.client.close();
+        // consumer.client.close();
       });
       this.consumers = [];
       return;
@@ -103,7 +148,7 @@ class Microed {
 
       clearTimeout(consumer.tDebounceResume);
       consumer.close();
-      consumer.client.close();
+      // consumer.client.close();
     }
   }
 
@@ -158,15 +203,16 @@ class Microed {
   }
 
   async destroy () {
-    await this.db.close();
+    let promises = [
+      this.db.close(),
+      new Promise(resolve => {
+        this.producer.close(resolve);
+        this.producer.client.close();
+      }),
+      ...this.consumers.map(consumer => consumer.close(true)),
+    ];
 
-    let closables = [ this.producer, ...this.consumers ];
-    await Promise.all(closables.map(closable => {
-      return new Promise(resolve => {
-        closable.close(resolve);
-        closable.client.close();
-      });
-    }));
+    await Promise.all(promises);
   }
 
   async sendAllMessages () {
