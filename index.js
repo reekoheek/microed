@@ -12,35 +12,32 @@ class Microed {
     return require('./middleware');
   }
 
-  constructor (options) {
-    this.options = options;
+  constructor ({ dataDir = './.microed', clientOptions, consumerOptions, producerOptions } = {}) {
+    this.dataDir = dataDir;
+    this.clientOptions = clientOptions;
+    this.consumerOptions = consumerOptions;
+    this.producerOptions = producerOptions;
+
     this.producer = this.createProducer();
     this.consumers = [];
 
-    let { dataDir = './.microed' } = options || {};
-    this.dataDir = dataDir;
     this.db = levelup(leveldown(this.dataDir));
     this.index = 0;
     this.unwritten = [];
-    // this.messages = [];
   }
 
   observe (topic, callback) {
     let consumer = this.consumers.find(consumer => consumer.topic === topic);
     if (!consumer) {
       let client = this.createClient();
-      let opts = {
-        // autoCommit: false,
-      };
 
-      consumer = new Consumer(client, [ { topic, partition: 0 } ], opts);
+      consumer = new Consumer(client, [ { topic, partition: 0 } ], this.consumerOptions);
 
       consumer.topic = topic;
       consumer.observers = [];
 
-      consumer.on('error', () => {
-        // noop
-        // debug('Consumer error', err);
+      consumer.on('error', err => {
+        debug('Consumer error', err);
       });
 
       client.on('connect', () => {
@@ -123,7 +120,6 @@ class Microed {
   async putMessage (m) {
     if (this.sending) {
       this.unwritten.push(m);
-      // console.log('put unwritten')
       return;
     }
 
@@ -138,7 +134,6 @@ class Microed {
     batch = batch.put(this.index++, JSON.stringify(m));
 
     await batch.write();
-    // console.log('put written')
   }
 
   getMessages () {
@@ -189,7 +184,6 @@ class Microed {
           break;
         }
 
-        // console.log('written messages', messages);
         await this.sendMessages(messages.map(m => m.value));
 
         await this.deleteMessages(messages);
@@ -257,11 +251,10 @@ class Microed {
   createProducer () {
     let client = this.createClient();
 
-    let producer = new HighLevelProducer(client);
+    let producer = new HighLevelProducer(client, this.producerOptions);
 
-    producer.on('error', () => {
-      // noop
-      // debug('Producer error', err);
+    producer.on('error', err => {
+      debug('Producer error', err);
     });
 
     producer.once('ready', () => {
@@ -272,11 +265,10 @@ class Microed {
   }
 
   createClient () {
-    let client = new KafkaClient(this.options);
+    let client = new KafkaClient(this.clientOptions);
 
-    client.on('error', () => {
-      // noop
-      // debug('Client error', err);
+    client.on('error', err => {
+      debug('Client error', err);
     });
 
     return client;

@@ -1,23 +1,23 @@
 class Observer {
-  constructor ({ topic, producer } = {}) {
+  constructor ({ topic, microed } = {}) {
     this.topic = topic;
-    this.producer = producer;
+    this.microed = microed;
   }
 
   async insert ({ query }, next) {
-    let producer = this.getProducer(query);
+    let microed = this.getMicroed(query);
     let topic = this.getTopic(query);
     let mode = 'insert';
 
     await next();
 
     query.rows.forEach(row => {
-      producer.send(topic, { mode, row });
+      microed.send(topic, { mode, row });
     });
   }
 
   async update ({ query }, next) {
-    let producer = this.getProducer(query);
+    let microed = this.getMicroed(query);
     let topic = this.getTopic(query);
     let mode = 'update';
 
@@ -27,12 +27,12 @@ class Observer {
 
     rows.forEach(async row => {
       row = await query.session.factory(query.schema.name, row.id).single();
-      producer.send(topic, { mode, row });
+      microed.send(topic, { mode, row });
     });
   }
 
   async delete ({ query }, next) {
-    let producer = this.getProducer(query);
+    let microed = this.getMicroed(query);
     let topic = this.getTopic(query);
     let mode = 'delete';
 
@@ -40,18 +40,18 @@ class Observer {
 
     await next();
 
-    rows.forEach(({ id }) => {
-      producer.send(topic, { mode, row: { id } });
+    rows.forEach(row => {
+      microed.send(topic, { mode, row });
     });
   }
 
-  getProducer (query) {
-    let producer = this.producer || query.session.state.microed;
-    if (!producer) {
-      throw new Error('Unspecifed microed producer');
+  getMicroed (query) {
+    let microed = this.microed || query.session.state.microed;
+    if (!microed) {
+      throw new Error('Unspecifed microed, you might want to use microed middleware!');
     }
 
-    return producer;
+    return microed;
   }
 
   getTopic (query) {

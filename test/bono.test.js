@@ -16,21 +16,21 @@ describe('bono addons', () => {
 
   it('add microed to ctx state', async () => {
     let bundle = new Bundle();
-    let producer = new Microed({ dataDir: './.microed-producer' });
+    let microed = new Microed({ dataDir: './.microed-producer' });
 
-    bundle.use(microedMiddleware({ producer }));
+    bundle.use(microedMiddleware({ microed }));
 
     try {
       bundle.get('/', ctx => {
         assert(ctx.state.microed);
-        assert.strictEqual(ctx.state.microed, producer);
+        assert.strictEqual(ctx.state.microed, microed);
       });
 
       await test(bundle.callback())
         .get('/')
         .expect(200);
     } finally {
-      producer.destroy();
+      microed.destroy();
     }
   });
 });

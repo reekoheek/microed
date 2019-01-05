@@ -1,7 +1,7 @@
-const Microed = require('.');
-
-module.exports = function microedMiddleware ({ producer, options } = {}) {
-  let microed = producer || new Microed(options);
+module.exports = function microedMiddleware ({ microed } = {}) {
+  if (!microed) {
+    throw new Error('Undefined microed instance');
+  }
 
   return async (ctx, next) => {
     ctx.state.microed = microed;
