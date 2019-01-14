@@ -1,11 +1,12 @@
-const Microed = require('..');
+const { Producer } = require('..');
 
 const INTERVAL = 100;
 
-let producer = new Microed({ dataDir: './.microed-producer' });
+let index = Number(process.argv[2]) || 0;
+let producer = new Producer({ dataDir: './.microed-producer' });
 
 function send () {
-  let value = { date: new Date() };
+  let value = { date: new Date(), index: index++ };
 
   console.info('produce', value);
 
@@ -27,3 +28,10 @@ trySend();
 // producer.sending = false;
 // send();
 // send();
+
+process.on('SIGINT', async () => {
+  console.info('destroying');
+  await producer.destroy();
+  console.info('destroyed');
+  process.exit();
+});
