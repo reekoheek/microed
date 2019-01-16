@@ -54,10 +54,10 @@ describe('norm addons', () => {
         });
       });
     } finally {
-      consumer.destroy();
-      producer.destroy();
+      await consumer.destroy();
+      await producer.destroy();
     }
-  });
+  }).timeout(30000);
 });
 
 function createManager (schemas = []) {
