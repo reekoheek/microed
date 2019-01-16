@@ -2,7 +2,7 @@ const { ConsumerGroupStream } = require('kafka-node');
 const debug = require('debug')('microed:consumer');
 
 class Consumer {
-  constructor ({ kafkaHost } = {}) {
+  constructor ({ kafkaHost = 'localhost:9092' } = {}) {
     this.kafkaHost = kafkaHost;
 
     this.consumers = [];
@@ -71,7 +71,7 @@ class Consumer {
 
   createConsumer (topic) {
     let consumer = new ConsumerGroupStream({
-      kafkaHost: this.kafkaHost || 'localhost:9092',
+      kafkaHost: this.kafkaHost,
       ssl: false,
       // groupId: groupId,
       sessionTimeout: 30000,

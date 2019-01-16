@@ -1,35 +1,35 @@
-const Microed = require('..');
-const { MicroedObserver } = Microed;
+const { Producer, Consumer, Observer } = require('..');
 const { Manager } = require('node-norm');
 const rmdir = require('./_lib/rmdir');
+const path = require('path');
+
+const PRODUCER_DATA_DIR = path.join(process.cwd(), '.microed');
 
 describe('norm addons', () => {
   beforeEach(async () => {
-    await rmdir('./.microed-producer');
-    await rmdir('./.microed-consumer');
+    await rmdir(PRODUCER_DATA_DIR);
   });
 
   afterEach(async () => {
-    await rmdir('./.microed-producer');
-    await rmdir('./.microed-consumer');
+    await rmdir(PRODUCER_DATA_DIR);
   });
 
   it('send update as event', async () => {
-    let producer = new Microed({ dataDir: './.microed-producer' });
-    let consumer = new Microed({ dataDir: './.microed-consumer' });
+    let producer = new Producer({ dataDir: PRODUCER_DATA_DIR });
+    let consumer = new Consumer();
 
     try {
       let manager = createManager([
         {
           name: 'foo',
           observers: [
-            new MicroedObserver(),
+            new Observer(),
           ],
         },
       ]);
 
       await manager.runSession(async session => {
-        session.state.microed = producer;
+        session.state.microedProducer = producer;
 
         let { rows: [ row ] } = await session.factory('foo')
           .insert({ name: 'foo1' })

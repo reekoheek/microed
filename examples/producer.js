@@ -1,6 +1,6 @@
 const { Producer } = require('..');
 
-const INTERVAL = 100;
+const INTERVAL = 0;
 
 let index = Number(process.argv[2]) || 0;
 let producer = new Producer({ dataDir: './.microed-producer' });
@@ -13,10 +13,13 @@ function send () {
   producer.send('foo', value);
 }
 
+let sendT;
 function trySend () {
+  // for (let i = 0; i < 20; i++) {
   send();
+  // }
 
-  setTimeout(trySend, INTERVAL);
+  sendT = setTimeout(trySend, INTERVAL);
 }
 
 trySend();
@@ -31,6 +34,7 @@ trySend();
 
 process.on('SIGINT', async () => {
   console.info('destroying');
+  clearTimeout(sendT);
   await producer.destroy();
   console.info('destroyed');
   process.exit();

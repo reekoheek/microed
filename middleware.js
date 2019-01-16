@@ -1,10 +1,7 @@
-module.exports = function microedMiddleware ({ microed } = {}) {
-  if (!microed) {
-    throw new Error('Undefined microed instance');
-  }
-
+module.exports = function microedMiddleware ({ producer, consumer }) {
   return async (ctx, next) => {
-    ctx.state.microed = microed;
+    ctx.state.microedProducer = producer;
+    ctx.state.microedConsumer = consumer;
 
     await next();
   };

@@ -1,36 +1,30 @@
-const Microed = require('..');
-const { microedMiddleware } = Microed;
+const { middleware } = require('..');
 const Bundle = require('bono');
 const test = require('supertest');
 const assert = require('assert');
-const rmdir = require('./_lib/rmdir');
 
 describe('bono addons', () => {
-  beforeEach(async () => {
-    await rmdir('./.microed-producer');
-  });
-
-  afterEach(async () => {
-    await rmdir('./.microed-producer');
-  });
-
   it('add microed to ctx state', async () => {
     let bundle = new Bundle();
-    let microed = new Microed({ dataDir: './.microed-producer' });
+    let producer = {
+      destroy () {
+        // noop
+      },
+    };
 
-    bundle.use(microedMiddleware({ microed }));
+    bundle.use(middleware({ producer }));
 
     try {
       bundle.get('/', ctx => {
-        assert(ctx.state.microed);
-        assert.strictEqual(ctx.state.microed, microed);
+        assert(ctx.state.microedProducer);
+        assert.strictEqual(ctx.state.microedProducer, producer);
       });
 
       await test(bundle.callback())
         .get('/')
         .expect(200);
     } finally {
-      microed.destroy();
+      await producer.destroy();
     }
   });
 });

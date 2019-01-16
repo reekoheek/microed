@@ -5,32 +5,47 @@ const Queue = require('./lib/queue');
 const { Mutex } = require('await-semaphore');
 
 class Producer {
-  constructor ({ dataDir = path.join(process.cwd(), '.microed'), kafkaHost } = {}) {
+  constructor ({ dataDir = path.join(process.cwd(), '.microed'), kafkaHost = 'localhost:9092' } = {}) {
     this.kafkaHost = kafkaHost;
 
     this.raw = this.createProducer();
 
     this.mutex = new Mutex();
     this.queue = new Queue({ dataDir });
+
+    this.repeatDrain();
   }
 
   async send (topic, value) {
     await this.queue.put({ topic, value });
 
+    this.drain();
+  }
+
+  async repeatDrain () {
+    clearTimeout(this.repeatDrainTimeout);
+
+    await this.drain();
+
+    this.repeatDrainTimeout = setTimeout(() => this.repeatDrain(), 1000);
+  }
+
+  async drain (force) {
     if (!this.raw.ready) {
       return;
     }
 
-    this.drain();
-  }
+    if (!force && this.draining) {
+      return;
+    }
 
-  async drain () {
+    this.draining = true;
     await this.mutex.use(async () => {
       try {
         debug('Draining...');
 
-        while (1) {
-          let items = await this.queue.fetch();
+        let items;
+        while ((items = await this.queue.fetch())) {
           if (items.length === 0) {
             return;
           }
@@ -68,9 +83,12 @@ class Producer {
         // console.error('Draining caught err', err);
       }
     });
+    this.draining = false;
   }
 
   async destroy () {
+    clearTimeout(this.repeatDrainTimeout);
+    await this.drain(true);
     await this.queue.close();
     await new Promise(resolve => this.raw.close(resolve));
     debug('Producer destroyed');

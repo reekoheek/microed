@@ -1,17 +1,20 @@
 const { Producer, Consumer } = require('..');
 const rmdir = require('./_lib/rmdir');
+const path = require('path');
+
+const PRODUCER_DATA_DIR = path.join(process.cwd(), '.microed');
 
 describe('Case', () => {
   beforeEach(async () => {
-    await rmdir('./.microed');
+    await rmdir(PRODUCER_DATA_DIR);
   });
 
   afterEach(async () => {
-    await rmdir('./.microed');
+    await rmdir(PRODUCER_DATA_DIR);
   });
 
-  it.only('produce and consume topic', async () => {
-    let producer = new Producer();
+  it('produce and consume topic', async () => {
+    let producer = new Producer({ dataDir: PRODUCER_DATA_DIR });
     let consumer = new Consumer();
 
     try {
