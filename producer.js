@@ -5,7 +5,7 @@ const Queue = require('./lib/queue');
 const { Mutex } = require('await-semaphore');
 
 class Producer {
-  constructor ({ dataDir = path.join(process.cwd(), '.microed'), kafkaHost = 'localhost:9092', drainInterval = 10000 } = {}) {
+  constructor ({ dataDir = path.join(process.cwd(), '.microed'), kafkaHost = 'localhost:9092', drainInterval = 3000 } = {}) {
     this.kafkaHost = kafkaHost;
 
     this.drainInterval = drainInterval;
@@ -21,10 +21,7 @@ class Producer {
   async send (topic, value) {
     await this.queue.put({ topic, value });
 
-    clearTimeout(this.sendDebounceTimeout);
-    this.sendDebounceTimeout = setTimeout(() => {
-      this.drain();
-    }, 300);
+    this.drain();
   }
 
   async repeatDrain () {
@@ -92,11 +89,10 @@ class Producer {
   }
 
   async destroy () {
-    clearTimeout(this.sendDebounceTimeout);
-    clearTimeout(this.repeatDrainTimeout);
     await this.drain(true);
     await this.queue.close();
     await new Promise(resolve => this.raw.close(resolve));
+    clearTimeout(this.repeatDrainTimeout);
     debug('Producer destroyed');
   }
 
