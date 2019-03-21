@@ -5,12 +5,16 @@ const Queue = require('./lib/queue');
 const { Mutex } = require('await-semaphore');
 
 class Producer {
-  constructor ({ dataDir = path.join(process.cwd(), '.microed'), kafkaHost = 'localhost:9092', drainInterval = 3000 } = {}) {
-    this.kafkaHost = kafkaHost;
+  constructor ({ dataDir, kafkaHost, drainInterval } = {}) {
+    this.kafkaHost = kafkaHost || 'localhost:9092';
 
-    this.drainInterval = drainInterval;
+    this.drainInterval = drainInterval || 3000;
 
     this.raw = this.createProducer();
+
+    if (!dataDir) {
+      dataDir = path.join(process.cwd(), '.microed');
+    }
 
     this.mutex = new Mutex();
     this.queue = new Queue({ dataDir });

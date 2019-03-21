@@ -2,8 +2,8 @@ const { ConsumerGroupStream } = require('kafka-node');
 const debug = require('debug')('microed:consumer');
 
 class Consumer {
-  constructor ({ kafkaHost = 'localhost:9092' } = {}) {
-    this.kafkaHost = kafkaHost;
+  constructor ({ kafkaHost } = {}) {
+    this.kafkaHost = kafkaHost || 'localhost:9092';
 
     this.consumers = [];
   }
